@@ -1,60 +1,74 @@
-# Homework 3 — Part 1: Star Schema Modeling
+# Homework 3 — Parts 1 & 2: Star Schema + ETL + Analytical Questions
 
 **Course:** Big Data Analytics — MSc in Data Science
-**Topic:** Data Warehouse design for financial transactions
+**Topic:** Data Warehouse design and analysis for financial transactions
 
-This folder contains **Part 1** of Homework 3: the dimensional (star schema) modeling
-of a financial-transactions data warehouse. The ETL implementation and the analytical
-questions (Part 2) and the Streamlit dashboard (Part 3) are **not** included here.
+This folder contains **Parts 1 and 2** of Homework 3. Part 3 (Streamlit dashboard) is in progress and not yet included.
 
-## What Part 1 does
+---
 
-Starting from three source files (`symbols.csv`, the account statement and
-`country.csv`), Part 1 designs a **ROLAP star schema** on paper and draws its diagram:
+## Part 1 — Star Schema Modeling
 
-- **1.1 — Business Process & Fact Grain.** The fact is one *event/transaction*:
-  one row of `Fact_Transactions` represents **one transaction** from the account
-  statement (finest grain, no pre-aggregation).
-- **1.2 — Fact and Dimensions.** Each source attribute is assigned either to the fact
-  table or to exactly **one** dimension, avoiding duplication (e.g. `country` lives
-  only in `Dim_Geography`).
-- **1.3 — Dimension Hierarchies.** Day → Month → Quarter → Year (Time);
-  Country → Sub-region → Region (Geography); Symbol → Industry → Sector (Symbol).
-- **1.4 — Star Schema.** The final schema with **surrogate keys** (PK) on every
-  dimension and the matching **foreign keys** in the fact table. The notebook cell
-  draws the diagram and saves it as `star_schema.png`.
+Starting from three source files (`symbols.csv`, the account statement and `country.csv`), Part 1 designs a **ROLAP star schema** on paper and draws its diagram:
 
-## Star schema
+- **1.1 — Business Process & Fact Grain.** One row of `Fact_Transactions` = **one transaction** from the account statement (event/transaction fact, finest grain, no pre-aggregation).
+- **1.2 — Fact and Dimensions.** Each source attribute assigned to exactly one table; no duplication (`country` lives only in `Dim_Geography`).
+- **1.3 — Dimension Hierarchies.** Day → Month → Quarter → Year (Time, with `DayOfWeek` as descriptive cross attribute); Country → Sub-region → Region (Geography); Symbol → Industry → Sector (Symbol).
+- **1.4 — Star Schema.** Surrogate keys on every dimension, matching foreign keys in the fact table. The notebook cell draws and saves `star_schema.png`.
 
 ```
-Fact_Transactions ( TimeId(FK), SymbolId(FK), GeoId(FK), TypeId(FK), IDTransaction, Unit )
-Dim_Time          ( TimeId(PK), Date, Day, DayOfWeek, Month, MonthName, Quarter, Year )
-Dim_Symbol        ( SymbolId(PK), Symbol, Company, Industry, Sector )
-Dim_Geography     ( GeoId(PK), Country, SubRegion, Region )
+Fact_Transactions   ( TimeId(FK), SymbolId(FK), GeoId(FK), TypeId(FK), IDTransaction, Unit )
+Dim_Time            ( TimeId(PK), Date, Day, DayOfWeek, Month, MonthName, Quarter, Year )
+Dim_Symbol          ( SymbolId(PK), Symbol, Company, Industry, Sector )
+Dim_Geography       ( GeoId(PK), Country, SubRegion, Region )
 Dim_TransactionType ( TypeId(PK), TransactionType )
 ```
 
 ![Star schema diagram](star_schema.png)
 
-- `Unit` is the only explicit **measure** (additive via SUM).
-- `IDTransaction` is kept as a **descriptive (degenerate)** attribute for traceability.
+---
+
+## Part 2 — ETL and Analytical Questions
+
+### 2.1 — Load and Clean the Data (ETL)
+
+Three-phase ETL following the course slides (Extract → Transform → Load):
+
+- **Extraction:** three CSVs with different separators (`;` vs `,`).
+- **Transformation — Cleansing:** removed trailing empty column and 464 empty rows; parsed dates and types; checked for duplicates and domain values (`DIVIDENT` kept in fact table).
+- **Transformation — Conforming:** excluded 212 transactions with unresolvable foreign keys (18 orphan tickers); reconciled country names (`Turkey`→`Türkiye`, `Taiwan`→`Taiwan, Province of China`); fixed missing geography hierarchy for Taiwan.
+- **Loading:** built all four dimension tables with surrogate keys; built `Fact_Transactions` via key lookups; verified referential integrity with `assert`.
+
+### 2.2 — Analytical Questions
+
+Six questions answered over the star schema (one OLAP view built once via a chained `merge`, then each question is a `filter + groupby + aggregate`):
+
+| Q | Question | OLAP operation |
+|---|---|---|
+| Q1 | Top 5 US sectors by SELL transactions | slice + roll-up to Sector + COUNT |
+| Q3 | Quarters ranked by BUY+SELL transactions | roll-up to Quarter + COUNT |
+| Q5 | Top 5 regions by units bought | roll-up to Region + SUM (additive measure) |
+| Q7 | Top 10 symbols by transactions | finest Symbol level + COUNT |
+| Q12 | Top 3 sectors by units sold on Mondays | DayOfWeek cross attribute + roll-up + SUM |
+| Q14 *(bonus)* | Top 10 industry-region pairs by transactions | cross-dimensional (Symbol × Geography) + COUNT |
+
+---
 
 ## Files in this folder
 
 | File | Description |
 |------|-------------|
-| `Homework3-Alfredo-Fabio-Bonanno.ipynb` | Part 1 notebook: modeling (1.1–1.4) + the code cell that draws the star schema |
-| `star_schema.png` | Star schema diagram (Part 1 deliverable) generated by the notebook |
+| `Homework3-Alfredo-Fabio-Bonanno.ipynb` | Main notebook: Parts 1 and 2 (executed, with outputs) |
+| `star_schema.png` | Star schema diagram generated by the notebook |
+| `Report_Homework3.md` | Written report covering Parts 1 and 2 |
 | `Homework3_Financial_Transactions.pdf` | Original assignment text |
-| `symbols.csv`, `country.csv`, `account-statement-1-1-2024-12-31-2024.csv` | Source datasets (used by Part 2; included here for reference) |
+| `symbols.csv`, `country.csv`, `account-statement-1-1-2024-12-31-2024.csv` | Source datasets |
 
-## How to reproduce the diagram
-
-The Part 1 code cell only needs `matplotlib` and reads **no** data file:
+## How to run
 
 ```bash
-pip install matplotlib
+pip install pandas numpy matplotlib
 jupyter notebook "Homework3-Alfredo-Fabio-Bonanno.ipynb"
 ```
 
-Running the code cell regenerates `star_schema.png`.
+Run all cells in order (the ETL cells must run before the 2.2 analysis cells).
