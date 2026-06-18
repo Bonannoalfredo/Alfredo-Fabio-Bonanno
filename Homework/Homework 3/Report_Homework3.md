@@ -47,11 +47,14 @@
 
 **Overall picture:** the account is strongly tech-oriented (whatever the metric: counts, units, weekdays) and was managed very actively in the first half of 2024, almost passively in the second.
 
-## 4. Deliverables (current state — Part 3 Streamlit in progress)
+## 4. Deliverables
 
-1. `Homework3-Alfredo-Fabio-Bonanno.ipynb` — ETL logic, star schema construction, analytical queries (Parts 1 and 2, executed with outputs).
-2. `star_schema.png` — diagram of the star schema (generated in section 1.4 of the notebook).
-3. `Report_Homework3.md` — this report (covers Parts 1 and 2).
-4. `Homework3_Financial_Transactions.pdf` — original assignment text.
+1. `Homework3-Alfredo-Fabio-Bonanno.ipynb` — ETL logic, star schema construction, analytical queries and the Part 3 description (Parts 1, 2 and 3, executed with outputs).
+2. `streamlit_app/` — Part 3: Streamlit dashboard (Time Analysis page). Multi-page app (`Home.py` + `pages/1_Time_Analysis.py`) reusing the section 2.1 ETL through `utils/data_loader.py`, cached with `@st.cache_data`. Run it with `cd streamlit_app && pip install -r requirements.txt && streamlit run Home.py`.
+3. `star_schema.png` — diagram of the star schema (generated in section 1.4 of the notebook).
+4. `Report_Homework3.md` — this report (covers Parts 1, 2 and 3).
+5. `Homework3_Financial_Transactions.pdf` — original assignment text.
 
-> **Note:** Part 3 (Streamlit dashboard — Time Analysis page) is not yet included in this folder.
+## 5. Part 3 — Dashboard design
+
+The dashboard answers the assignment's **Time Analysis** page: a date-range filter (defaults 01/01/2024 → 31/12/2024) drives, in a single reactive view, a line chart of BUY+SELL transactions over time and bar charts of the top 3 symbols, top 5 sectors and top 5 industries by transaction count. Each interaction re-runs the page script top-to-bottom (Streamlit's execution model), so the ETL and the OLAP star-join are wrapped in `@st.cache_data` functions in `utils/data_loader.py` and computed only once. The charts are the same slice + roll-up operations of section 2.2, expressed with `value_counts()`/`groupby` over the cached OLAP view.
